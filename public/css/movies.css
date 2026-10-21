@@ -1,0 +1,33 @@
+.movie-search {
+    max-width: 28rem;
+}
+
+.movie-search .dropdown-menu {
+    max-height: 22rem;
+    overflow-y: auto;
+}
+
+.movie-search .dropdown-item.active,
+.movie-search .dropdown-item:active {
+    background-color: var(--bs-secondary-bg);
+    color: var(--bs-body-color);
+}
+
+.movie-card-poster {
+    cursor: pointer;
+}
+
+.movie-card-poster img {
+    transition: opacity 0.15s ease-in-out;
+}
+
+.movie-card-poster:hover img,
+.movie-card-poster:focus-visible img {
+    opacity: 0.8;
+}
+
+@media (max-width: 991.98px) {
+    .movie-search {
+        max-width: none;
+    }
+}

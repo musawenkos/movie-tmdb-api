@@ -11,11 +11,17 @@ submission for Brief 1.
 - **Login and logout:** with the default test user from the brief.
 - **Favourites:** a logged-in user can add and remove favourites, and has a page
   that lists only their own.
+- **Search with autocomplete:** a search box in the navigation bar suggests
+  titles as you type (arrow keys and Enter work). Picking a suggestion opens its
+  details; pressing Enter shows a full results page, also 9 per page.
+- **Movie details popup:** clicking a poster or "More info" on any card opens a
+  popup with the tagline, genres, runtime, rating and overview, and an add or
+  remove favourite button. Search results can be favourited too.
 - **Contact page:** my name, contact details and social links.
 
 ## What you need
 
-- PHP [[8.3]] and Composer
+- PHP 8.3 or newer and Composer
 - Docker, only to run MySQL (any MySQL 8 server will work instead)
 - A free TMDB account, for an API token
 
@@ -24,7 +30,7 @@ submission for Brief 1.
 1. Clone the repo and install the packages:
 
 ```
-   git clone [[repo url]]
+   git clone https://github.com/musawenkos/movie-tmdb-api.git
    cd movie-tmdb-api
    composer install
 ```
@@ -68,10 +74,11 @@ submission for Brief 1.
 ```
 
    Or, if you would rather use the database dump, create an empty database and
-   import `database/[[aglet_movies.sql]]`:
+   import `database/aglet_movies.sql`. It has every table, the default user and
+   a couple of saved favourites, but no sessions or cache rows:
 
 ```
-   docker exec -i aglet_mysql mysql -u aglet -p aglet_movies < database/[[aglet_movies.sql]]
+   docker exec -i aglet_mysql mysql -u aglet -p aglet_movies < database/aglet_movies.sql
 ```
 
 6. Start the app and open http://127.0.0.1:8000
@@ -80,7 +87,14 @@ submission for Brief 1.
    php artisan serve
 ```
 
-Cache: the app uses the `[[database]]` cache driver, so you don't need Redis.
+7. Optional: run the tests. They use an in-memory SQLite database and fake every
+   TMDB call, so they need neither MySQL nor a token:
+
+```
+   php artisan test
+```
+
+Cache: the app uses the `database` cache driver, so you don't need Redis.
 
 Login from the brief: username `jointheteam`, email `jointheteam@aglet.co.za`,
 password `@TeamAglet`. You can log in with either the username or the email.
@@ -108,8 +122,13 @@ list changes slowly, and a long cache keeps the page fast and the number of
 TMDB requests low.
 
 **Adult content.** The brief says no explicit content. The app drops any movie
-that isn't explicitly marked as not adult. I don't rely on a TMDB request
-parameter for that, because the popular endpoint doesn't document one.
+that isn't explicitly marked as not adult. I also send `include_adult=false`,
+but I don't rely on it, because the popular endpoint doesn't document it.
+Search made a second problem visible: TMDB marks plenty of softcore titles as
+not adult. So titles containing words like "sex", "erotic" or "porn" (whole
+words only) are dropped too, from every list and from the popup. This hides a
+few harmless films, such as "Sex and the City", which I think is the right
+trade for a professional test.
 
 **The TMDB token.** I use the read access token, sent as a header, and not the
 API key in the URL, so it can't end up in URLs or logs. It lives in `.env`,
@@ -146,8 +165,30 @@ Forms use CSRF tokens, and movie data is escaped in the views.
 user. This is separate from the cache: the cache protects TMDB, and the limits
 protect my own endpoints.
 
-**Bad input.** A page number that isn't a whole number between 1 and 5 returns a
-404, and the favourite form rejects ids that aren't whole numbers.
+**Search and the popup.** Search uses TMDB's search endpoint and goes through
+the same service, filters and 9-per-page pagination as the popular list. The
+autocomplete reads only the first TMDB page and returns 8 titles as JSON; the
+browser waits 250 ms after the last keystroke and cancels stale requests.
+Search results and suggestions are cached for 10 minutes per query (lower-cased
+and trimmed, so "Dune" and " dune" share one entry), and movie details are
+cached like the popular list. The popup gets its data from a JSON endpoint,
+`/movies/{id}`, and the script builds it with `textContent`, never `innerHTML`,
+so movie data can't inject markup. Queries must be 2 to 100 characters. Search
+is limited to 30 requests a minute, suggestions to 120 and details to 60.
+
+**Favouriting search results.** The form still sends only an id. The server
+looks it up in the cached popular list first and otherwise asks TMDB for that
+movie's details, so the rule from above still holds: the saved title and poster
+come from TMDB, never from the browser, and unknown or adult ids are rejected.
+
+**Bad input.** A page number that isn't a whole number inside the list (1 to 5
+for the popular list) returns a 404, and the favourite form rejects ids that
+aren't whole numbers.
+
+**Tests.** Feature tests in `tests/Feature` cover the 9-per-page and 45-movie
+limits, login with username or email, the favourite rules (own favourites
+only, no duplicates, bad ids), search, autocomplete, the details endpoint, the
+adult filters and the TMDB-down case.
 
 ## Trade-offs and limits
 
@@ -157,12 +198,14 @@ protect my own endpoints.
 - If TMDB is down and the cache is empty, people see an error page instead of
   wrong data. The failure is logged and is never cached.
 - Saved favourites can go stale, as described above.
-- Only the popular list is shown. There is no search or filtering.
+- Search results can be up to 10 minutes out of date.
+- The title-word filter can't catch every explicit film whose title gives no
+  hint, and it hides a few harmless ones.
 - Adding or removing a favourite reloads the page.
-- I have not written automated tests. Yet
 
 ## If I had more time
 
 - Add and remove favourites without reloading the page, with a JSON response
   from the same controller actions.
-- Write feature tests for login, the favourite rules and the page limits.
+- Add genre and year filters to search.
+- Turn the TMDB code into a WordPress plugin, the third brownie point.

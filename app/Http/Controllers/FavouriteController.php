@@ -23,22 +23,24 @@ class FavouriteController extends Controller
         $id = $request->integer('tmdb_movie_id');
 
         try {
-            $movie = collect($tmdb->popularMovies())->firstWhere('tmdb_movie_id', $id);
-        } catch (ConnectionException | RequestException $e) {
+            // Popular movies are already cached; anything else (a search result) is looked up on TMDB.
+            $movie = collect($tmdb->popularMovies())->firstWhere('tmdb_movie_id', $id)
+                ?? $tmdb->movie($id);
+        } catch (ConnectionException|RequestException $e) {
             Log::error('TMDB request failed', ['message' => $e->getMessage()]);
 
             return back()->withErrors(['tmdb_movie_id' => 'Movies are temporarily unavailable. Try again shortly.']);
         }
 
         if (! $movie) {
-            return back()->withErrors(['tmdb_movie_id' => 'That movie is not in the list.']);
+            return back()->withErrors(['tmdb_movie_id' => 'That movie could not be found.']);
         }
 
         $favourite = $request->user()->favourites()->createOrFirst(
             ['tmdb_movie_id' => $id],
             [
-                'title'        => $movie['title'],
-                'poster_path'  => $movie['poster_path'],
+                'title' => $movie['title'],
+                'poster_path' => $movie['poster_path'],
                 'release_date' => $movie['release_date'],
             ]
         );

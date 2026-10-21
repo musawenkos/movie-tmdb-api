@@ -24,9 +24,10 @@ return [
 
     'tmdb' => [
         'token' => env('TMDB_TOKEN'),
-        'base_url' => env('TMDB_URL','https://api.themoviedb.org/3'),
-        'img_url' => env('TMDB_IMG_URL'),
-        'cache_ttl' => (int) env('TMDB_CACHE_TTL', 3600)
+        // `?:` rather than a default argument, so an empty value in .env still falls back.
+        'base_url' => env('TMDB_URL') ?: 'https://api.themoviedb.org/3',
+        'img_url' => env('TMDB_IMG_URL') ?: 'https://image.tmdb.org/t/p/w342',
+        'cache_ttl' => (int) (env('TMDB_CACHE_TTL') ?: 10800),
     ],
 
     'ses' => [
